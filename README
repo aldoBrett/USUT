@@ -1,0 +1,19 @@
+USUT
+====
+
+UserSpace USB Testing is an attempt to replace actual USB testing (based on usbtest driver) with a userland driver. To achieve this libusb has been used.
+
+USUT git repository:
+http://github.com/aldoBrett/USUT
+
+libusb homepage:
+http://libusb.sourceforge.net
+
+- Aldo Brett Cedillo Martinez <x0130339@ti.com>
+
+
+
+SPECIAL THANKS:
+Anand Gadiyar - for sharing his USB knowledge with me.
+Aharon Campos - for his help in Makefiles.
+Ricardo Perez - for helping me with Git.

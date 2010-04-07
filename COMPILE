@@ -1,0 +1,15 @@
+Compiling Instructions
+======================
+
+The compilation of USUT is very straight forward, just 
+follow this easy steps:
+
+1- Install libusb*.
+2- Go to the source directory of the test, and execute:
+	#make
+3- In case of getting "error while loading shared 
+libraries" you need to execute:
+	#sudo ldconfig
+
+
+* It was developed with libusb-1.0.6 version
