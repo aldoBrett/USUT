@@ -2,6 +2,8 @@
  * User space USB testing implemented with libusb.
  * Copyright (C) 2010 Aldo Brett Cedillo Martinez <x0130339@ti.com>
  *
+ * Based in testusb.c developed by David Brownell.
+ *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
  * License as published by the Free Software Foundation; either
@@ -35,10 +37,14 @@
 #define BULK_IN			0x81	//In end point.
 #define BULK_OUT		0x01 	//Out end point.
 
+#define LOOPBACK_CONFIG		2	//Configuration numeration used in Gadget Zero.
+#define SOURCESINK_CONFIG	3
+
 /* FIXME pattern should be available for user to change, should this also be done 
  * using get opt?
  */
 static unsigned pattern = 0;
+static int deviceConfiguration = 0;
 
 struct usbtest_param {	//This structure is used to make work as testusb.c
 	//inputs
@@ -96,18 +102,28 @@ static int usbtest_tests (struct testdev *dev)
 			 * check how to do this.
 			 */
 			printf ("TEST 1: write %d bytes %u times\n", dev->param.length, dev->param.iterations);
-                        retval = simple_io (dev, dev->param.iterations, 0, 0, "Test 2 =D", 0);
+                        retval = simple_io (dev, dev->param.iterations, 0, 0, "Test 1", 0);
 			break;
 		case 2:
 			/* usbtest driver checks if there is an in_pipe, 
 			 * check how to do this.
 			 */
 			printf ("TEST 2: read %d bytes %u times\n", dev->param.length, dev->param.iterations);
-			retval = simple_io (dev, dev->param.iterations, 0, 0, "Test 2 =D", 1);
+			retval = simple_io (dev, dev->param.iterations, 0, 0, "Test 2", 1);
+			break;
+		case 3:
+			printf ("TEST 3: write/%d 0..%d bytes %u times\n", dev->param.vary, dev->param.length,
+				dev->param.iterations);
+			retval = simple_io (dev, dev->param.iterations, dev->param.vary, 0, "Test 3", 0);
+			break;
+		case 4:
+			printf ("TEST 4: read/%d 0..%d bytes %u times\n", dev->param.vary, dev->param.length,
+				dev->param.iterations);
+			retval = simple_io (dev, dev->param.iterations, dev->param.vary, 0, "Test 4", 1);
 			break;
 	}
 
-	return 0;
+	return retval;
 }
 
 static int is_testdev (libusb_device *dev)
@@ -212,6 +228,9 @@ static int find_testdev (void)
                                 }
                         }
 
+			if (libusb_get_configuration (devHandle, &deviceConfiguration) < 0) {
+				fprintf (stderr, "Couln't get libusb_get_configuration for device\n");
+			}
 
 			if ((entry = calloc (1, sizeof (*entry))) == 0) {
 				fputs ("no mem!\n", stderr);
@@ -301,7 +320,7 @@ int main(int argc, char **argv)
 	/* for easy use when hotplugging, FIXME don't get it */
 	device = getenv ("DEVICE");
 
-	while ((c = getopt (argc, argv, "D:ac:g:hns:t:v:")) != EOF)
+	while ((c = getopt (argc, argv, "D:ac:g:hnps:t:v:")) != EOF)
 	switch (c) {
 		case 'a':	/* use all devices */
 			device = 0;
@@ -317,6 +336,9 @@ int main(int argc, char **argv)
 			continue;
 		case 'n':	/* no test running */
 			not = 1;
+			continue;
+		case 'p':
+			pattern = 1;
 			continue;
 		case 's':	/* size of packets */
 			param.length = atoi (optarg);
@@ -442,6 +464,7 @@ static inline int simple_check_buf (char *buffer, unsigned len)
 		fprintf (stderr, "buf[%d] = %d (not %d)\n", i, *buffer, expected);
 		return -1; //FIXME write adequate error (EINVAL)
 	}
+
 	return 0;
 }
 
@@ -458,14 +481,14 @@ static int simple_io (  struct testdev  *dev,
 	char *buf;
 	int retval = 0;
 	int transferred;
+	int max = dev->param.length;
 
 	buf = calloc (dev->param.length, sizeof(char));
 
 	while (retval == 0 && iterations-- > 0) {
-		if (direction == 0)	//Out
+		if (direction == 0) {		//Out
 			simple_fill_buf (buf, dev->param.length);
 
-		if (direction == 0) {		//Out
 			retval = libusb_bulk_transfer (dev->devHandle, BULK_OUT, buf, dev->param.length, &transferred, TIMEOUT);
 	                if (retval != 0) {
         	                fprintf (stderr, "Bulk write error %d\n", retval);
@@ -478,12 +501,21 @@ static int simple_io (  struct testdev  *dev,
 				fprintf (stderr, "Bulk read error %d\n", retval);
 				break;
 			}
+
+			if (retval == 0)
+				retval = simple_check_buf (buf, dev->param.length);
 		}
 
-		if (retval == 0 && direction == 1)	
-			retval = simple_check_buf (buf, dev->param.length);	//FIXME implement this function.
+		if (vary) {		//FIXME implement this.
+			int len = dev->param.length;
 
-//		if (vary)		//FIXME implement this.
+			len += vary;
+			len %= max;
+
+			if (len == 0)
+				len = (vary < max) ? vary : max;
+			dev->param.length = len;
+		}
 
 	}
 
